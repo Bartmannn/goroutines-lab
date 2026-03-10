@@ -9,6 +9,7 @@ import (
 
 type Vertex struct {
 	travelerId              string
+	lastDirection           int
 	availableNeighbours     [4]bool
 	visiblePaths            []int
 	isBlocked               bool
@@ -19,6 +20,27 @@ type Vertex struct {
 	gainFromReviverChan     chan Message
 	fromNeighboursChan      []chan Message
 	toNeighboursChan        []chan Message
+}
+
+func directionName(direction int) string {
+	switch direction {
+	case DirectionUp:
+		return "up"
+	case DirectionRight:
+		return "right"
+	case DirectionDown:
+		return "down"
+	case DirectionLeft:
+		return "left"
+	default:
+		return "unknown"
+	}
+}
+
+func logEvent(format string, args ...any) {
+	if AreCommentLabels {
+		fmt.Printf(format+"\n", args...)
+	}
 }
 
 func (v *Vertex) NewSecondsTimer(t time.Duration) *SecondsTimer {
@@ -45,6 +67,7 @@ func (v *Vertex) initNeigboursResponse() {
 
 func (v *Vertex) revive(id string) {
 	v.travelerId = id
+	v.lastDirection = DirectionNone
 	if len(id) == 2 {
 		v.notifyBlock()
 	}
@@ -71,6 +94,7 @@ func (v *Vertex) updateSnapshot(requestType string) {
 	v.sendToSnapshotChan <- Message{
 		requestType: requestType,
 		travelerId:  v.travelerId,
+		direction:   v.lastDirection,
 		code:        200,
 		dirs:        v.visiblePaths,
 	}
@@ -79,10 +103,16 @@ func (v *Vertex) updateSnapshot(requestType string) {
 
 func (v *Vertex) serviceTimer() {
 	<-v.liveTime.timer.C
-	if AreCommentLabels {
-		fmt.Println(v.travelerId, "live time out")
+	switch v.travelerId {
+	case SquatterId:
+		logEvent("Squatter disappeared.")
+	case DangerId:
+		logEvent("Danger disappeared.")
+	default:
+		logEvent("Traveler %s disappeared.", v.travelerId)
 	}
 	v.travelerId = EmptyId
+	v.lastDirection = DirectionNone
 	v.updateSnapshot("liveTimeOut")
 }
 
@@ -96,21 +126,15 @@ func (v *Vertex) serviceReviver(toReviver chan<- Message, fromReviver <-chan Mes
 			} else {
 				v.revive(reviverRequest.travelerId)
 				if v.travelerId == SquatterId {
-					if AreCommentLabels {
-						fmt.Println("New squatter appears.")
-					}
+					logEvent("A squatter appeared.")
 					v.liveTime = *v.NewSecondsTimer(SquatterLiveTime)
 					go v.serviceTimer()
 				} else if v.travelerId == DangerId {
-					if AreCommentLabels {
-						fmt.Println("New danger appears.")
-					}
+					logEvent("A danger appeared.")
 					v.liveTime = *v.NewSecondsTimer(DangerLiveTime)
 					go v.serviceTimer()
 				} else {
-					if AreCommentLabels {
-						fmt.Println("New traveler appears.")
-					}
+					logEvent("Traveler %s entered the board.", v.travelerId)
 				}
 				// toReviver <- Message{code: 200}
 				reviverRequest.responseChan <- Message{code: 200}
@@ -133,6 +157,7 @@ func (v *Vertex) tryMove() {
 		message := Message{
 			requestType:  "movement",
 			travelerId:   v.travelerId,
+			direction:    moveDir,
 			code:         200,
 			responseChan: tempRespone,
 		}
@@ -147,16 +172,16 @@ func (v *Vertex) tryMove() {
 		select {
 		case neigbourResponse := <-tempRespone:
 			if neigbourResponse.code >= 200 && 300 > neigbourResponse.code {
-				if AreCommentLabels {
-					fmt.Println(v.travelerId, ": ", moveDir)
-				}
+				logEvent("Traveler %s moved %s.", v.travelerId, directionName(moveDir))
 				v.travelerId = EmptyId
+				v.lastDirection = DirectionNone
 				v.notifyUnblock()
 				v.visiblePaths = append(v.visiblePaths, moveDir)
 				v.updateSnapshot("moveOutUpdate")
 			} else if neigbourResponse.code >= 500 {
 				if neigbourResponse.requestType == "kill" {
 					v.travelerId = EmptyId
+					v.lastDirection = DirectionNone
 					v.notifyUnblock()
 				} else {
 					v.tryMove()
@@ -181,6 +206,7 @@ func (v *Vertex) serviceNeigbour(dir int, toNeighbour chan<- Message, fromNeigbo
 			case "movement":
 				if v.travelerId == EmptyId && !v.isBlocked {
 					v.travelerId = neigbourRequest.travelerId
+					v.lastDirection = neigbourRequest.direction
 					if v.travelerId == SquatterId {
 						v.liveTime = *v.NewSecondsTimer(neigbourRequest.restTime)
 						go v.serviceTimer()
@@ -192,17 +218,15 @@ func (v *Vertex) serviceNeigbour(dir int, toNeighbour chan<- Message, fromNeigbo
 				} else if v.travelerId == SquatterId {
 					v.tryMove()
 					v.travelerId = neigbourRequest.travelerId
-					if AreCommentLabels {
-						fmt.Println(v.travelerId, "moves Squatter.")
-					}
+					v.lastDirection = neigbourRequest.direction
+					logEvent("Traveler %s displaced a squatter.", v.travelerId)
 					v.notifyBlock()
 					v.updateSnapshot("moveToUpdate")
 					neigbourRequest.responseChan <- Message{code: 200}
 				} else if v.travelerId == DangerId {
-					if AreCommentLabels {
-						fmt.Println(neigbourRequest.travelerId, "stepped on danger!")
-					}
+					logEvent("Traveler %s stepped on danger and disappeared.", neigbourRequest.travelerId)
 					v.travelerId = EmptyId
+					v.lastDirection = DirectionNone
 					v.liveTime.Stop()
 					v.updateSnapshot("moveToUpdate")
 					neigbourRequest.responseChan <- Message{code: 200, requestType: "kill"}

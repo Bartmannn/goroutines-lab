@@ -1,9 +1,36 @@
 package server_solution
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 )
+
+func waitForShutdown() {
+	stopChan := make(chan os.Signal, 1)
+	enterChan := make(chan struct{}, 1)
+
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(stopChan)
+
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		_, err := reader.ReadString('\n')
+		if err == nil {
+			enterChan <- struct{}{}
+		}
+	}()
+
+	fmt.Println("To stop press ENTER key or use Ctrl+C")
+
+	select {
+	case <-enterChan:
+	case <-stopChan:
+	}
+}
 
 func Init() {
 
@@ -16,6 +43,7 @@ func Init() {
 		for x := 0; x < FieldWidth; x++ {
 			verticiesGrid[y][x] = Vertex{
 				travelerId:          EmptyId,
+				lastDirection:       DirectionNone,
 				availableNeighbours: [4]bool{true, true, true, true},
 				visiblePaths:        make([]int, 0),
 				isBlocked:           false,
@@ -119,7 +147,6 @@ func Init() {
 	wg.Add(1)
 	go reviver.start(&wg)
 
-	fmt.Println("To stop press ENTER key")
-	fmt.Scanln()
+	waitForShutdown()
 
 }

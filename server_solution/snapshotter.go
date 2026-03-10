@@ -53,7 +53,7 @@ func (s *Snapshotter) buildBoard(wg *sync.WaitGroup) {
 	for y := 0; y < FieldHeight*2-1; y++ {
 		s.board[y] = make([]Field, FieldWidth*2-1)
 		for x := 0; x < FieldWidth*2-1; x++ {
-			s.board[y][x] = Field{id: "  ", isVisible: true}
+			s.board[y][x] = Field{id: EmptyFieldSymbol, isVisible: true}
 			if x%2 == 0 && y%2 == 0 {
 				s.board[y][x].isVisible = true
 				wg.Add(1)
@@ -80,11 +80,11 @@ func (s *Snapshotter) listenVertex(x, y int, toVertex chan<- Message, fromVertex
 				// }
 				switch vertexResponse.travelerId {
 				case EmptyId:
-					s.board[y][x].id = "  "
+					s.board[y][x].id = EmptyFieldSymbol
 				case SquatterId:
-					s.board[y][x].id = "**"
+					s.board[y][x].id = SquatterSymbol
 				case DangerId:
-					s.board[y][x].id = "##"
+					s.board[y][x].id = DangerSymbol
 				default:
 					s.board[y][x].id = vertexResponse.travelerId
 				}

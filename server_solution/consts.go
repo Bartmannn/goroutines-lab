@@ -11,6 +11,20 @@ const SquatterId string = "*"
 const DangerId string = "#"
 const VerticalPath string = "|"
 const HorizontalPath string = "-"
+const EmptyFieldSymbol string = "  "
+const SquatterSymbol string = "**"
+const DangerSymbol string = "##"
+const TravelerIdleSymbol string = "oo"
+const TravelerUpSymbol string = "^^"
+const TravelerRightSymbol string = ">>"
+const TravelerDownSymbol string = "vv"
+const TravelerLeftSymbol string = "<<"
+
+const DirectionUp int = 0
+const DirectionRight int = 1
+const DirectionDown int = 2
+const DirectionLeft int = 3
+const DirectionNone int = -1
 
 const BoardRefreshRate time.Duration = time.Millisecond * 2000
 const NewTravelerCooldown time.Duration = time.Millisecond * 6000
