@@ -13,7 +13,7 @@ This project was built as an experiment with Go and its lightweight approach to 
 
 ## Demo
 
-
+https://github.com/user-attachments/assets/8ef2e0db-1bc3-4014-b1ba-900a7240db90
 
 ## Simulation rules
 
