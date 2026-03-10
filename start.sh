@@ -1,0 +1,1 @@
+docker build -t gorutines-lab . && docker run --rm -it gorutines-lab
